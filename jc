@@ -1,0 +1,317 @@
+#!/bin/bash
+if [ -z $1 ]
+then	
+	echo "No option entered: Try ./jc -h for more help"
+	exit 1
+elif [ "$1" == "-h" ] 
+then
+	echo "Name:	jc - JUNK CLEANER"	
+	echo "Usage: ./jc [option].. [file].. "
+	echo -e "This page gives a basic overview of the junkcleaner i.e\n\tjc command. "
+	echo "Options:"
+	echo "-C:	Removes caches and cookies"
+	echo "-c:	Compress file given if it is an old file."
+	echo "-d:	Deletes file given from trash folder."
+	echo "-s:	Removes shortcuts of file from unity menu. "
+	echo "-t: To set cron for activating periodic removal of junk files. "
+	echo "-u:	Uninstalls the applicaions from pc."
+	echo "-w:	To scrape the contents of web page containing information about junk cleaning!"
+
+elif [ "$1" == "-d" ]
+then
+flag=0
+	while(($#>1))
+	do
+		flag=1	
+		echo "Checking the file(s) .."
+		rm -r ~/.local/share/Trash/files/$2 2> /dev/null
+			if(($?==0))
+			then
+				echo "Successfully removed $2"
+			elif(($?==1))
+			then 
+				echo "File or directory of name $2 not found!"
+			fi	
+		shift
+	done
+	if (($#==1 && flag==0))
+	then
+		
+		echo "Are you sure to delete the Trash directory? Enter y if yes"
+		read character 
+			if [ "$character" == "y" ]
+			then
+				rm -r ~/.local/share/Trash/files 
+				
+			else
+				echo "ok then re-enter the command with argument(s)"
+				
+			fi
+	fi	
+
+elif [ "$1" == "-s" ]
+then
+	
+	echo "REMOVING SHORTCUTS OF APPLICATIONS"
+	if [ -z $2 ]
+	then
+		echo "No file entered. Please try later with appropriate file"
+	fi
+	while(($#>1))
+	do
+		app=$2
+		x=`find /usr/share -iname $app*.png  2>/dev/null`
+		echo ""
+		y=`find /usr/share -iname $app*.desktop  2>/dev/null`
+		echo $x
+		for i in $x,$y
+		do
+			ls -l $i 
+			sudo rm $i
+			if(($?==0))
+			then
+				echo "Successfully removed $i"
+			elif(($?==1))
+			then 
+				echo "File $i not found!"
+			fi	
+		done
+		shift
+	done
+
+elif [ "$1" == "-c" ]
+then
+	echo "Compression of old files" 
+		if [ -z "$2" ]
+		then  
+			echo "Default time is 3 months"
+			echo "Enter multiple of the time you want (integer)."
+			read time
+		else
+	    	time=$2
+	 	fi
+	 	
+	time=$(echo "$time*30" |bc )    
+    	x=`find .  -mtime +$time -atime +$time ! -name *.gz`
+    	flag=0
+    	while(($#>2))
+    	do
+		flag=1
+		for i in $x
+    		do
+    			if [ "$i" = "$3" ]
+			then
+	       		gzip -rv $3
+	        		break
+	        	fi
+		done
+		shift
+	done
+	if (($flag==0))
+	then
+		flag=1
+		echo "These files can be compressed"  
+		echo $x |more
+		echo "Press 1 to compress all files."
+	   	read choice
+			if [ $choice -eq 1 ]
+			then
+		  		find . -mtime +$time -atime +$time ! -name *.gz -exec gzip -rqv {} \;
+		 	else
+			echo "Try again."
+			fi
+  	fi
+	
+elif [ "$1" == "-C" ]
+then
+	echo "Deleting cache and cookies"
+	echo "Enter Choice"
+	echo "1.Cache"
+	echo "2.Cookies"
+     read choice
+   	if [ $choice -eq 1 ]
+  	then
+   		echo "To Delete all caches press 1"
+   		read input
+   		if(($input==1))
+   		then
+	   		if [ -d ~/.cache/mozilla/firefox/*.default ]
+		     then
+			 	rm -r ~/.cache/mozilla/firefox/*.default/  2>/dev/null
+				 	if(($?==0))
+					then
+							echo "Successfully removed all caches."
+					elif(($?==1))
+					then 
+							echo "Error while deleting caches."
+							echo "Maybe all caches are deleted in last clean!"
+					fi	
+		 	else
+			 	echo "Caches are not stored in this directory."
+			 	echo "Check the path of dowloaded caches in your system."
+			fi
+		else
+			echo "Wrong choice"
+		fi
+     elif [ $choice -eq 2 ]
+     then
+    		if [ -d ~/.mozilla/firefox/*.default ]
+    	     then
+      		echo -e "Enter the options-\n1.To Delete all cookies \n2.To Delete cookies of selected domains"
+      		echo -e "3.To Delete cookies of forms submitted \n4.To Delete history of previously viewed pages."
+      		echo "5.To delete all bookmarks"
+         		read b
+        		if [ $b -eq 1 ]
+        		then
+        			#not preferable
+         			rm -r ~/.mozilla/firefox/*.default/ 2>/dev/null
+             	elif [ $b -eq 2 ]
+            	then
+            		cd ./.mozilla/firefox/*.default
+				echo Deleting cookies from domains
+				echo $(echo " select distinct baseDomain from moz_cookies;"|sqlite3 cookies.sqlite ) >lst
+				echo "The cookies from the following sites have been stored in your pc !"
+				tr ' ' '\n' < lst 
+				echo "Enter the domain name of the site whose cookies are to be deleted from the above list"
+				read name1 
+				echo "delete from moz_cookies where baseDomain = '$name1' ;"|sqlite3 cookies.sqlite
+				echo Successfully removed cookies from domain $name1
+				cd
+			elif [ $b -eq 3 ]
+			then
+				cd ./.mozilla/firefox/*.default
+				echo Deleting form histories 
+				echo $(echo "select distinct fieldname from moz_formhistory;"|sqlite3 formhistory.sqlite) > form
+				tr ' ' '\n' < form 
+				echo Enter a fieldname to delete 
+				read name1 
+				echo "delete from moz_formhistory where fieldname = '$name1' ;"|sqlite3 formhistory.sqlite
+				echo Successfully removed field $name1
+				cd
+			elif [ $b -eq 4 ]
+			then
+				cd ./.mozilla/firefox/*.default	
+				echo "Enter the options-"
+				echo "1.To delete all history"
+				echo "2.To delete the history of web pages visited less than a count i.e you can enter the frequency of visit"
+				read option
+					if(($option == 1))
+					then
+						echo "delete * from moz_places ;"|sqlite3 places.sqlite
+						echo "Successfully removed all history"
+					elif(($option==2))
+					then
+						echo "Enter the no of visit"
+						read num
+						echo "delete from moz_places where visit_count<$num ;"|sqlite3 places.sqlite
+						echo "Successfully removed pages with less than $name1 visits"
+					fi
+				cd
+			elif [ $b -eq 5 ]
+			then
+				cd ./.mozilla/firefox/*.default	
+				echo Deleting bookmarks
+				echo ENter 1 to delete all bookmarks
+				read num
+					if ((num == 1 ))
+					then
+						echo "delete * from moz_bookmark;"|sqlite3 places.sqlite
+					fi
+				cd
+			fi
+		else
+		 	  echo "Cookies are not stored in this directory."
+		    	  echo "Check the path of dowloaded cookies in your system."	
+  	 	fi
+   	fi
+elif [ "$1" == "-u" ]
+then
+	if [ -z $2 ]
+	then
+		echo "enter application name "
+		read app
+	else
+		app=$2
+	fi
+	flag=1
+	find / -iname $app* 2>/dev/null
+	
+	echo -e "Files from this list will be deleted.\nPlease provide sudo password for uninstallation.\nTo proceed, press 1." 
+	read choice
+	if [ $choice -eq 1 ] 
+	then
+		sudo apt-get remove $app 2>/dev/null
+		sudo apt-get purge $app 2>/dev/null
+		sudo apt-get autoremove $app && sudo apt-get clean $app 2>/dev/null
+	else
+		echo "Try again later with the right name"
+	fi
+elif [ "$1" == "-t" ]
+then
+	flag=1
+	
+		echo -e "Crontab is used for periodic execution of a task."
+		#Repeated deletion of cache and cookies are not suggested without knowledge so we have set the cron just for the deletion of 		#trash files only
+		crontab -l 2>/dev/null 1>~/cron.txt
+		#We will set it to today 
+		echo "Setting cron for deletion of trash files older than 3 months every sunday at 10:50 AM"
+		#syntax for setting cron
+		#minutes[0-59] hour[0-23] date[0-28/29/30/31] month[1-12] week[0-6] ..command to be executed
+		echo "51 10 * * 0 find ~/.local/share/Trash/files -mtime +90 -atime +90 -exec rm {}\;" >> cron.txt
+		crontab cron.txt
+	
+		echo "To disable the weekly junk cleaning facility press y."
+		read yes
+		if [ "$yes" == "y" ]
+		then
+			crontab -l > cron.txt
+			#sed -e '/find .*/d' cron.txt >file.txt && mv file.txt cron.txt
+			crontab cron.txt
+			rm cron.txt 
+		else
+			echo "Cron set"
+		fi	 
+	
+	
+elif [ "$1" == "-w" ]
+then
+	flag=1	
+	#wget www.filecleaner.com/what-are-junk-files -O link.txt 
+	mv xyz link.txt
+	grep '<h4>' link.txt|sed -e 's/<[^>]\+>//g' 1>./HEADING.txt
+	cat HEADING.txt 
+	echo ""
+	x=0
+	while(($x==0 ))
+	do
+		echo "Enter 1 for question 1,2 for question 2 and 3 for question 3"
+		read choice
+		case $choice in 
+		1)
+			head -1 HEADING.txt
+			grep -m 2  '<p>.*</p>' link.txt|tail -1|sed -e 's/<[^>]\+>//g' 
+			echo ""
+			;;
+		2)
+			head -2 HEADING.txt|tail -1
+			grep -m 3 '<p>.*</p>' link.txt|tail -1|sed -e 's/<[^>]\+>//g'
+			echo ""	
+			;;
+		3)
+			head -3 HEADING.txt|tail -1 
+			grep -m 4 '<p>.*</p>' link.txt|tail -1|sed -e 's/<[^>]\+>//g'
+			;;
+		*)
+			echo "Wrong Input"
+			;;
+		esac
+		echo "Enter 0 to read another article or try again"
+		read x
+	done	
+	rm link.txt HEADING.txt
+		
+else
+	echo "No such option exists : For further help type ./jc -h"
+	exit 1
+fi
+
